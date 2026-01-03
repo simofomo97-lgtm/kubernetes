@@ -16,11 +16,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) Télécharger les modules Go (recommandé)
       - name: Download Go modules
         run: go mod download
 
-      # 3) Générer un SBOM CycloneDX avec Trivy en mode "fs"
       - name: Generate SBOM with Trivy (CycloneDX)
         uses: aquasecurity/trivy-action@0.28.0
         with:
@@ -29,7 +27,6 @@ jobs:
           format: 'cyclonedx'
           output: 'sbom-trivy-cyclonedx.json'
 
-      # 4) Uploader le SBOM en artifact
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
