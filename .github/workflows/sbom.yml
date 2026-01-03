@@ -1,4 +1,4 @@
-name: Generate SBOM (Go + CycloneDX)
+name: Generate SBOM (Javascript + CycloneDX)
 
 on:
   push:
@@ -10,25 +10,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Récupérer le code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) Télécharger les modules Go (facultatif mais recommandé)
-      - name: Download Go modules
-        run: go mod download
-
-      # 3) Générer un SBOM CycloneDX avec Anchore (Syft)
       - name: Generate CycloneDX SBOM
         uses: anchore/sbom-action@v0
         with:
           path: .
           format: cyclonedx-json
-          output-file: sbom-cyclonedx.json
-
-      # 4) Publier le SBOM en artifact
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-cyclonedx
-          path: sbom-cyclonedx.json
+          output-file: sbom-cyclonedx.json   # fichier créé dans le workspace
+          artifact-name: sbom-cyclonedx.json
