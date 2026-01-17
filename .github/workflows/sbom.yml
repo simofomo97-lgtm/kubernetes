@@ -18,5 +18,16 @@ jobs:
         with:
           path: .
           format: cyclonedx-json
-          output-file: sbom-cyclonedx.json   # fichier créé dans le workspace
+          output-file: sbom-cyclonedx.json 
           artifact-name: sbom-cyclonedx.json
+
+      - name: Upload SBOM to Dependency-Track
+        uses: DependencyTrack/gh-upload-sbom@v3
+        with:
+          serverHostname: ${{ secrets.DT_HOSTNAME }}
+          apiKey: ${{ secrets.DT_APIKEY }}
+
+          projectName: "${{ github.repository }}"
+          projectVersion: "${{ github.ref_name }}"
+          bomFilename: "sbom-cyclonedx.json"
+          autoCreate: true
