@@ -1,0 +1,19 @@
+name: Upload a SBOM in Dependency Track
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Upload SBOM to Dependency-Track
+        uses: DependencyTrack/gh-upload-sbom@v3
+        with:
+          serverHostname: ${{ secrets.DEPENDENCYTRACK_HOSTNAME }}
+          apiKey: ${{ secrets.DT_APIKEY }}
+          project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
+          bomFilename: "sbom-cyclonedx.json"
