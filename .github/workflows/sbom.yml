@@ -19,7 +19,6 @@ jobs:
           path: .
           format: cyclonedx-json
           output-file: sbom-cyclonedx.json
-          artifact-name: sbom-cyclonedx.json
 
       # On publie le SBOM comme artefact pour que le job "upload" puisse le récupérer
       - name: Upload SBOM artifact
