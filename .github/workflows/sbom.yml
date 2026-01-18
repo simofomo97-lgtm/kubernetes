@@ -18,16 +18,33 @@ jobs:
         with:
           path: .
           format: cyclonedx-json
-          output-file: sbom-cyclonedx.json 
+          output-file: sbom-cyclonedx.json
           artifact-name: sbom-cyclonedx.json
-   upload:
-     runs-on: self-hosted
 
-     steps:
-        - name: Upload SBOM to Dependency-Track
-          uses: DependencyTrack/gh-upload-sbom@v3
-          with:
-            serverHostname: ${{ secrets.DEPENDENCYTRACK_HOSTNAME }}
-            apiKey: ${{ secrets.DT_APIKEY }}
-            project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
-            bomFilename: "sbom-cyclonedx.json"
+      # On publie le SBOM comme artefact pour que le job "upload" puisse le récupérer
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx.json
+          path: sbom-cyclonedx.json
+
+  upload:
+    needs: sbom    
+    runs-on: self-hosted 
+
+    steps:
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-cyclonedx.json
+          path: .
+
+      - name: Upload SBOM to Dependency-Track
+        uses: DependencyTrack/gh-upload-sbom@v3
+        with:
+          protocol: "http"
+          serverHostname: ${{ secrets.DEPENDENCYTRACK_HOSTNAME }}
+          port: "8081"
+          apiKey: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
+          project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
+          bomFilename: "sbom-cyclonedx.json"
