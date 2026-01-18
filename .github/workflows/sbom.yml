@@ -24,10 +24,7 @@ jobs:
       - name: Upload SBOM to Dependency-Track
         uses: DependencyTrack/gh-upload-sbom@v3
         with:
-          serverHostname: ${{ secrets.DT_HOSTNAME }}
+          serverHostname: ${{ secrets.DEPENDENCYTRACK_HOSTNAME }}
           apiKey: ${{ secrets.DT_APIKEY }}
-
-          projectName: ${{ github.repository }}
-          projectVersion: ${{ github.ref_name }}
+          project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
           bomFilename: "sbom-cyclonedx.json"
-          autoCreate: true
