@@ -1,4 +1,4 @@
-name: Generate SBOM (Go + CycloneDX)
+name: Generate SBOM and Upload in Dependency Track
 
 on:
   push:
