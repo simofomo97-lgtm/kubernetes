@@ -8,9 +8,9 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  sbom-security-gate:
+  sbom:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,8 +23,18 @@ jobs:
           output-file: sbom-cyclonedx.json
           artifact-name: sbom-cyclonedx.json
 
+  upload:
+    needs: sbom    
+    runs-on: self-hosted 
+
+    steps:
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-cyclonedx.json
+          path: .
+
       - name: Upload SBOM to Dependency-Track
-        id: upload-sbom
         uses: DependencyTrack/gh-upload-sbom@v3
         with:
           protocol: "http"
@@ -34,6 +44,11 @@ jobs:
           project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
           bomFilename: "sbom-cyclonedx.json"
 
+  security-gate:
+    needs: upload
+    runs-on: self-hosted
+
+    steps:
       - name: Wait for Dependency-Track analysis
         run: |
           echo "⏳ Attente de l'analyse Dependency-Track (30 secondes)..."
@@ -42,7 +57,7 @@ jobs:
       - name: Check Policy Violations
         id: check-violations
         run: |
-          PROJECT_UUID="${{ secrets.DEPENDENCYTRACK_PROJECT_UUID }}"
+          PROJECT_UUID='9d5ae6e5-5d61-47b7-9470-048ed16d2168'
           DT_HOST="${{ secrets.DEPENDENCYTRACK_HOSTNAME }}"
           DT_PORT="8081"
           API_KEY="${{ secrets.DEPENDENCYTRACK_APIKEY }}"
@@ -135,15 +150,17 @@ jobs:
           fi
 
       - name: Comment PR with results
-        if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
         with:
           script: |
-            const policyViolations = '${{ steps.check-violations.outputs.policy_violations_total }}';
-            const policyFails = '${{ steps.check-violations.outputs.policy_violations_fail }}';
-            const critical = '${{ steps.check-violations.outputs.critical_vulns }}';
-            const high = '${{ steps.check-violations.outputs.high_vulns }}';
-            const success = '${{ steps.check-violations.outcome }}' === 'success';
+            const fs = require('fs');
+            const metrics = JSON.parse(fs.readFileSync('metrics.json', 'utf8'));
+            
+            const policyViolations = metrics.policy_violations_total;
+            const policyFails = metrics.policy_violations_fail;
+            const critical = metrics.critical_vulns;
+            const high = metrics.high_vulns;
+            const success = metrics.outcome === 'success';
             
             const emoji = success ? '✅' : '❌';
             const status = success ? 'PASSED' : 'FAILED';
@@ -161,7 +178,7 @@ jobs:
             
             ${success ? '✅ Le build peut continuer.' : '🚫 Le build a été bloqué en raison de violations de sécurité.'}
             
-            🔗 [Voir les détails dans Dependency-Track](http://${{ secrets.DEPENDENCYTRACK_HOSTNAME }}:8081/projects/${{ secrets.DEPENDENCYTRACK_PROJECT_UUID }})
+            🔗 [Voir les détails dans Dependency-Track](http://${{ secrets.DEPENDENCYTRACK_HOSTNAME }}:8081/projects/9d5ae6e5-5d61-47b7-9470-048ed16d2168)
             `;
             
             github.rest.issues.createComment({
