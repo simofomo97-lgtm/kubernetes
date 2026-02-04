@@ -1,0 +1,172 @@
+name: SBOM Security Gate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  sbom-security-gate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom-cyclonedx.json
+          artifact-name: sbom-cyclonedx.json
+
+      - name: Upload SBOM to Dependency-Track
+        id: upload-sbom
+        uses: DependencyTrack/gh-upload-sbom@v3
+        with:
+          protocol: "http"
+          serverHostname: ${{ secrets.DEPENDENCYTRACK_HOSTNAME }}
+          port: "8081"
+          apiKey: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
+          project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
+          bomFilename: "sbom-cyclonedx.json"
+
+      - name: Wait for Dependency-Track analysis
+        run: |
+          echo "⏳ Attente de l'analyse Dependency-Track (30 secondes)..."
+          sleep 30
+
+      - name: Check Policy Violations
+        id: check-violations
+        run: |
+          PROJECT_UUID='9d5ae6e5-5d61-47b7-9470-048ed16d2168'
+          DT_HOST="${{ secrets.DEPENDENCYTRACK_HOSTNAME }}"
+          DT_PORT="8081"
+          API_KEY="${{ secrets.DEPENDENCYTRACK_APIKEY }}"
+          
+          echo "🔍 Récupération des métriques du projet..."
+          
+          # Récupérer les métriques du projet
+          METRICS=$(curl -s -X GET \
+            "http://${DT_HOST}:${DT_PORT}/api/v1/metrics/project/${PROJECT_UUID}/current" \
+            -H "X-Api-Key: ${API_KEY}" \
+            -H "accept: application/json")
+          
+          echo "📊 Métriques récupérées:"
+          echo "$METRICS" | jq '.'
+          
+          # Extraire les violations de politique
+          POLICY_VIOLATIONS_TOTAL=$(echo "$METRICS" | jq -r '.policyViolationsTotal // 0')
+          POLICY_VIOLATIONS_FAIL=$(echo "$METRICS" | jq -r '.policyViolationsFail // 0')
+          POLICY_VIOLATIONS_WARN=$(echo "$METRICS" | jq -r '.policyViolationsWarn // 0')
+          POLICY_VIOLATIONS_INFO=$(echo "$METRICS" | jq -r '.policyViolationsInfo // 0')
+          
+          # Extraire les vulnérabilités
+          CRITICAL=$(echo "$METRICS" | jq -r '.critical // 0')
+          HIGH=$(echo "$METRICS" | jq -r '.high // 0')
+          MEDIUM=$(echo "$METRICS" | jq -r '.medium // 0')
+          LOW=$(echo "$METRICS" | jq -r '.low // 0')
+          
+          echo "📋 Résumé des violations de politique:"
+          echo "  - Total: $POLICY_VIOLATIONS_TOTAL"
+          echo "  - FAIL: $POLICY_VIOLATIONS_FAIL"
+          echo "  - WARN: $POLICY_VIOLATIONS_WARN"
+          echo "  - INFO: $POLICY_VIOLATIONS_INFO"
+          
+          echo "🔐 Résumé des vulnérabilités:"
+          echo "  - Critiques: $CRITICAL"
+          echo "  - Hautes: $HIGH"
+          echo "  - Moyennes: $MEDIUM"
+          echo "  - Basses: $LOW"
+          
+          # Définir les seuils (personnalisables)
+          MAX_POLICY_VIOLATIONS_FAIL=0
+          MAX_CRITICAL_VULNS=0
+          MAX_HIGH_VULNS=5
+          
+          # Vérifier les seuils
+          FAIL_BUILD=false
+          
+          if [ "$POLICY_VIOLATIONS_FAIL" -gt "$MAX_POLICY_VIOLATIONS_FAIL" ]; then
+            echo "❌ ÉCHEC: $POLICY_VIOLATIONS_FAIL violations de politique FAIL détectées (max: $MAX_POLICY_VIOLATIONS_FAIL)"
+            FAIL_BUILD=true
+          fi
+          
+          if [ "$CRITICAL" -gt "$MAX_CRITICAL_VULNS" ]; then
+            echo "❌ ÉCHEC: $CRITICAL vulnérabilités critiques détectées (max: $MAX_CRITICAL_VULNS)"
+            FAIL_BUILD=true
+          fi
+          
+          if [ "$HIGH" -gt "$MAX_HIGH_VULNS" ]; then
+            echo "⚠️  AVERTISSEMENT: $HIGH vulnérabilités hautes détectées (max: $MAX_HIGH_VULNS)"
+            FAIL_BUILD=true
+          fi
+          
+          # Récupérer les détails des violations
+          if [ "$POLICY_VIOLATIONS_TOTAL" -gt 0 ]; then
+            echo ""
+            echo "📄 Détails des violations:"
+            VIOLATIONS=$(curl -s -X GET \
+              "http://${DT_HOST}:${DT_PORT}/api/v1/violation/project/${PROJECT_UUID}" \
+              -H "X-Api-Key: ${API_KEY}" \
+              -H "accept: application/json")
+            
+            echo "$VIOLATIONS" | jq -r '.[] | "  - Politique: \(.policyViolation.policyCondition.policy.name) | État: \(.policyViolation.type) | Composant: \(.component.name):\(.component.version)"' | head -n 10
+          fi
+          
+          # Exporter les résultats
+          echo "policy_violations_total=$POLICY_VIOLATIONS_TOTAL" >> $GITHUB_OUTPUT
+          echo "policy_violations_fail=$POLICY_VIOLATIONS_FAIL" >> $GITHUB_OUTPUT
+          echo "critical_vulns=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high_vulns=$HIGH" >> $GITHUB_OUTPUT
+          
+          # Échouer si nécessaire
+          if [ "$FAIL_BUILD" = true ]; then
+            echo ""
+            echo "🚫 BUILD BLOQUÉ en raison de violations de sécurité!"
+            echo "🔗 Consultez Dependency-Track: http://${DT_HOST}:${DT_PORT}/projects/${PROJECT_UUID}"
+            exit 1
+          else
+            echo ""
+            echo "✅ Aucune violation bloquante détectée. Build autorisé."
+          fi
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const policyViolations = '${{ steps.check-violations.outputs.policy_violations_total }}';
+            const policyFails = '${{ steps.check-violations.outputs.policy_violations_fail }}';
+            const critical = '${{ steps.check-violations.outputs.critical_vulns }}';
+            const high = '${{ steps.check-violations.outputs.high_vulns }}';
+            const success = '${{ steps.check-violations.outcome }}' === 'success';
+            
+            const emoji = success ? '✅' : '❌';
+            const status = success ? 'PASSED' : 'FAILED';
+            
+            const comment = `## ${emoji} Security Gate ${status}
+            
+            ### 📊 Résultats de l'analyse
+            
+            | Catégorie | Nombre |
+            |-----------|--------|
+            | 🔴 Violations FAIL | ${policyFails} |
+            | 📋 Violations totales | ${policyViolations} |
+            | 🔥 Vulnérabilités critiques | ${critical} |
+            | ⚠️ Vulnérabilités hautes | ${high} |
+            
+            ${success ? '✅ Le build peut continuer.' : '🚫 Le build a été bloqué en raison de violations de sécurité.'}
+            
+            🔗 [Voir les détails dans Dependency-Track](http://${{ secrets.DEPENDENCYTRACK_HOSTNAME }}:8081/projects/${{ secrets.DEPENDENCYTRACK_PROJECT_UUID }})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
