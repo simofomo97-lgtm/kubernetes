@@ -42,7 +42,7 @@ jobs:
       - name: Check Policy Violations
         id: check-violations
         run: |
-          PROJECT_UUID='9d5ae6e5-5d61-47b7-9470-048ed16d2168'
+          PROJECT_UUID="${{ secrets.DEPENDENCYTRACK_PROJECT_UUID }}"
           DT_HOST="${{ secrets.DEPENDENCYTRACK_HOSTNAME }}"
           DT_PORT="8081"
           API_KEY="${{ secrets.DEPENDENCYTRACK_APIKEY }}"
