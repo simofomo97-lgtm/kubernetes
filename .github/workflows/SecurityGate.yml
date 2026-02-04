@@ -43,116 +43,66 @@ jobs:
           apiKey: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
           project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
           bomFilename: "sbom-cyclonedx.json"
-
+          
   security-gate:
-    needs: upload
-    runs-on: self-hosted
-  
-    steps:
-      - name: Wait for Dependency-Track analysis
-        shell: powershell
-        run: |
-          Write-Host "⏳ Attente de l'analyse Dependency-Track (30 secondes)..."
-          Start-Sleep -Seconds 30
-  
-      - name: Check Policy Violations
-        id: check-violations
-        shell: powershell
-        run: |
-          $ProjectUuid = '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
-          $DtHost      = '${{ secrets.DEPENDENCYTRACK_HOSTNAME }}'
-          $DtPort      = '8081'
-          $ApiKey      = '${{ secrets.DEPENDENCYTRACK_APIKEY }}'
-  
-          Write-Host "🔍 Récupération des métriques du projet..."
-  
-          $headers = @{
-            'X-Api-Key' = $ApiKey
-            'accept'    = 'application/json'
-          }
-  
-          $metricsUrl = "http://$DtHost`:$DtPort/api/v1/metrics/project/$ProjectUuid/current"
-  
-          try {
-            $metrics = Invoke-RestMethod -Method GET -Uri $metricsUrl -Headers $headers
-          }
-          catch {
-            Write-Error "Impossible de récupérer les métriques: $_"
-            exit 1
-          }
-  
-          Write-Host "📊 Métriques récupérées:"
-          $metrics | ConvertTo-Json -Depth 5
-  
-          $policyTotal = $metrics.policyViolationsTotal
-          $policyFail  = $metrics.policyViolationsFail
-          $policyWarn  = $metrics.policyViolationsWarn
-          $policyInfo  = $metrics.policyViolationsInfo
-  
-          $critical = $metrics.critical
-          $high     = $metrics.high
-          $medium   = $metrics.medium
-          $low      = $metrics.low
-  
-          Write-Host "📋 Résumé des violations de politique:"
-          Write-Host "  - Total: $policyTotal"
-          Write-Host "  - FAIL:  $policyFail"
-          Write-Host "  - WARN:  $policyWarn"
-          Write-Host "  - INFO:  $policyInfo"
-  
-          Write-Host "🔐 Résumé des vulnérabilités:"
-          Write-Host "  - Critiques: $critical"
-          Write-Host "  - Hautes:    $high"
-          Write-Host "  - Moyennes:  $medium"
-          Write-Host "  - Basses:    $low"
-  
-          $maxPolicyFail   = 0
-          $maxCriticalVuln = 0
-          $maxHighVuln     = 5
-  
-          $failBuild = $false
-  
-          if ($policyFail -gt $maxPolicyFail) {
-            Write-Host "❌ ÉCHEC: $policyFail violations de politique FAIL détectées (max: $maxPolicyFail)"
-            $failBuild = $true
-          }
-  
-          if ($critical -gt $maxCriticalVuln) {
-            Write-Host "❌ ÉCHEC: $critical vulnérabilités critiques détectées (max: $maxCriticalVuln)"
-            $failBuild = $true
-          }
-  
-          if ($high -gt $maxHighVuln) {
-            Write-Host "⚠️  AVERTISSEMENT: $high vulnérabilités hautes détectées (max: $maxHighVuln)"
-            $failBuild = $true
-          }
-  
-          if ($policyTotal -gt 0) {
-            Write-Host ""
-            Write-Host "📄 Détails des violations (max 10):"
-  
-            $violationsUrl = "http://$DtHost`:$DtPort/api/v1/violation/project/$ProjectUuid"
-            try {
-              $violations = Invoke-RestMethod -Method GET -Uri $violationsUrl -Headers $headers
-              $violations | Select-Object -First 10 | ForEach-Object {
-                $policyName = $_.policyViolation.policyCondition.policy.name
-                $state      = $_.policyViolation.type
-                $component  = "$($_.component.name):$($_.component.version)"
-                Write-Host "  - Politique: $policyName | État: $state | Composant: $component"
-              }
-            }
-            catch {
-              Write-Warning "Impossible de récupérer le détail des violations: $_"
-            }
-          }
-  
-          if ($failBuild) {
-            Write-Host ""
-            Write-Host "🚫 BUILD BLOQUÉ en raison de violations de sécurité!"
-            Write-Host "🔗 Consultez Dependency-Track: http://$DtHost`:$DtPort/projects/$ProjectUuid"
-            exit 1
-          }
-          else {
-            Write-Host ""
-            Write-Host "✅ Aucune violation bloquante détectée. Build autorisé."
-          }
+      needs: upload
+      runs-on: self-hosted
+    
+      steps:
+        - name: Wait for Dependency-Track analysis
+          shell: cmd
+          run: >
+            powershell -ExecutionPolicy Bypass -Command
+            "Write-Host '⏳ Attente de l''analyse Dependency-Track (30 secondes)...';
+             Start-Sleep -Seconds 30"
+    
+        - name: Check Policy Violations
+          id: check-violations
+          shell: cmd
+          run: >
+            powershell -ExecutionPolicy Bypass -Command ^
+            "$ProjectUuid = '9d5ae6e5-5d61-47b7-9470-048ed16d2168'; ^
+             $DtHost      = '${{ secrets.DEPENDENCYTRACK_HOSTNAME }}'; ^
+             $DtPort      = '8081'; ^
+             $ApiKey      = '${{ secrets.DEPENDENCYTRACK_APIKEY }}'; ^
+             Write-Host '🔍 Récupération des métriques du projet...'; ^
+             $headers = @{ 'X-Api-Key' = $ApiKey; 'accept' = 'application/json' }; ^
+             $metricsUrl = \"http://$DtHost`:$DtPort/api/v1/metrics/project/$ProjectUuid/current\"; ^
+             try { $metrics = Invoke-RestMethod -Method GET -Uri $metricsUrl -Headers $headers } ^
+             catch { Write-Error \"Impossible de récupérer les métriques: $_\"; exit 1 }; ^
+             Write-Host '📊 Métriques récupérées:'; ^
+             $metrics | ConvertTo-Json -Depth 5; ^
+             $policyTotal = $metrics.policyViolationsTotal; ^
+             $policyFail  = $metrics.policyViolationsFail; ^
+             $policyWarn  = $metrics.policyViolationsWarn; ^
+             $policyInfo  = $metrics.policyViolationsInfo; ^
+             $critical = $metrics.critical; ^
+             $high     = $metrics.high; ^
+             $medium   = $metrics.medium; ^
+             $low      = $metrics.low; ^
+             Write-Host '📋 Résumé des violations de politique:'; ^
+             Write-Host \"  - Total: $policyTotal\"; ^
+             Write-Host \"  - FAIL:  $policyFail\"; ^
+             Write-Host \"  - WARN:  $policyWarn\"; ^
+             Write-Host \"  - INFO:  $policyInfo\"; ^
+             Write-Host '🔐 Résumé des vulnérabilités:'; ^
+             Write-Host \"  - Critiques: $critical\"; ^
+             Write-Host \"  - Hautes:    $high\"; ^
+             Write-Host \"  - Moyennes:  $medium\"; ^
+             Write-Host \"  - Basses:    $low\"; ^
+             $maxPolicyFail   = 0; ^
+             $maxCriticalVuln = 0; ^
+             $maxHighVuln     = 5; ^
+             $failBuild = $false; ^
+             if ($policyFail -gt $maxPolicyFail) { Write-Host \"❌ ÉCHEC: $policyFail violations de politique FAIL\"; $failBuild = $true }; ^
+             if ($critical -gt $maxCriticalVuln) { Write-Host \"❌ ÉCHEC: $critical vulnérabilités critiques\"; $failBuild = $true }; ^
+             if ($high -gt $maxHighVuln) { Write-Host \"⚠️  AVERTISSEMENT: $high vulnérabilités hautes\"; $failBuild = $true }; ^
+             if ($failBuild) { ^
+               Write-Host ''; ^
+               Write-Host '🚫 BUILD BLOQUÉ en raison de violations de sécurité!'; ^
+               Write-Host \"🔗 Consultez Dependency-Track: http://$DtHost`:$DtPort/projects/$ProjectUuid\"; ^
+               exit 1 ^
+             } else { ^
+               Write-Host ''; ^
+               Write-Host '✅ Aucune violation bloquante détectée. Build autorisé.' ^
+             }"
