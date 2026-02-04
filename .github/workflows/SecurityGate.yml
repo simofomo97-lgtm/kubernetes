@@ -56,7 +56,7 @@ jobs:
           id: check-violations
           shell: cmd
           run: >
-            powershell -ExecutionPolicy Bypass -File scripts/check_policy.ps1
+            powershell -ExecutionPolicy Bypass -File "%GITHUB_WORKSPACE%\scripts/check_policy.ps1
             -ProjectUuid '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
             -DtHost '${{ secrets.DEPENDENCYTRACK_HOSTNAME }}'
             -DtPort '8081'
