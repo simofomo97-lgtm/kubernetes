@@ -7,12 +7,14 @@ param(
 
 Write-Host "Recuperation des metriques du projet..."
 
+$DtHost = 'localhost'
 $headers = @{
     'X-Api-Key' = $ApiKey
     'accept'    = 'application/json'
 }
 
 $metricsUrl = "http://$DtHost`:$DtPort/api/v1/metrics/project/$ProjectUuid/current"
+Write-Host "URL metriques: $metricsUrl"
 
 try {
     $metrics = Invoke-RestMethod -Method GET -Uri $metricsUrl -Headers $headers
