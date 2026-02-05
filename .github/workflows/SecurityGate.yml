@@ -55,4 +55,4 @@ jobs:
             echo Workspace: %GITHUB_WORKSPACE%
             dir "%GITHUB_WORKSPACE%\scripts"
             powershell -ExecutionPolicy Bypass -Command "Get-ChildItem '%GITHUB_WORKSPACE%\scripts' | Format-Table Name,Extension"
-            powershell -ExecutionPolicy Bypass -File "%GITHUB_WORKSPACE%\scripts\check_policy.ps1" -ProjectUuid '9d5ae6e5-5d61-47b7-9470-048ed16d2168' -DtHost 'localhost' -DtPort '8081' -ApiKey '${{ secrets.DEPENDENCYTRACK_APIKEY }}'
+            powershell -ExecutionPolicy Bypass -File "%GITHUB_WORKSPACE%\scripts\check_policy.ps1" -ProjectUuid "9d5ae6e5-5d61-47b7-9470-048ed16d2168" -DtHost localhost -DtPort 8081 -ApiKey '${{ secrets.DEPENDENCYTRACK_APIKEY }}'
