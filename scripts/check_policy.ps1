@@ -7,13 +7,15 @@ param(
 
 Write-Host "Recuperation des metriques du projet..."
 
+# Pour les tests locaux, on force le host
 $DtHost = 'localhost'
+
 $headers = @{
     'X-Api-Key' = $ApiKey
     'accept'    = 'application/json'
 }
 
-$metricsUrl = "http://$DtHost`:$DtPort/api/v1/metrics/project/$ProjectUuid/current"
+$metricsUrl = "http://{0}:{1}/api/v1/metrics/project/{2}/current" -f $DtHost, $DtPort, $ProjectUuid
 Write-Host "URL metriques: $metricsUrl"
 
 try {
