@@ -50,7 +50,7 @@ jobs:
     
       steps:
         - name: Check Policy Violations
-          shell: cmd
+          shell: powershell
           run: |
             echo Workspace: %GITHUB_WORKSPACE%
             dir "%GITHUB_WORKSPACE%\scripts"
