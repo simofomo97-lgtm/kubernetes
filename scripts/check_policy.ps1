@@ -5,6 +5,10 @@ param(
     [string]$ApiKey
 )
 
+Write-Host "Longueur ApiKey: $($ApiKey.Length)"
+$apiKeyHash = [BitConverter]::ToString((New-Object System.Security.Cryptography.SHA256Managed).ComputeHash([Text.Encoding]::UTF8.GetBytes($ApiKey)))
+Write-Host "SHA256 ApiKey: $apiKeyHash"
+
 Write-Host "Recuperation des metriques du projet..."
 
 # Pour les tests locaux, on force le host
