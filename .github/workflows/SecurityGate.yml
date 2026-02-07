@@ -44,7 +44,7 @@ jobs:
           project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
           bomFilename: "sbom-cyclonedx.json"
  
-      security-gate:
+  security-gate:
     needs: upload
     runs-on: self-hosted
 
