@@ -43,20 +43,76 @@ jobs:
           apiKey: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
           project: '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
           bomFilename: "sbom-cyclonedx.json"
-
+ 
   security-gate:
-    needs: upload
-    runs-on: self-hosted
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check Policy Violations
-        shell: powershell
-        run: |
-          & "$env:GITHUB_WORKSPACE\scripts\check_policy.ps1" `
-            -ProjectUuid '9d5ae6e5-5d61-47b7-9470-048ed16d2168' `
-            -DtHost 'localhost' `
-            -DtPort '8081' `
-            -ApiKey 'odt_tf0hF7jq_ezIqKJcFQecbL4WfS9DDKMl8dgQLU4w0'
+      needs: upload
+      runs-on: self-hosted
+  
+      steps:
+        - name: Direct Policy Check (inline)
+          shell: powershell
+          run: |
+            $ProjectUuid = '9d5ae6e5-5d61-47b7-9470-048ed16d2168'
+            $DtHost      = 'localhost'
+            $DtPort      = '8081'
+            $ApiKey      = 'odt_tf0hF7jq_ezIqKJcFQecbL4WfS9DDKMl8dgQLU4w0'  # ou ton secret si tu préfères
+  
+            Write-Host "Recuperation des metriques du projet..."
+  
+            $headers = @{
+              'X-Api-Key' = $ApiKey
+              'accept'    = 'application/json'
+            }
+  
+            $metricsUrl = "http://{0}:{1}/api/v1/metrics/project/{2}/current" -f $DtHost, $DtPort, $ProjectUuid
+            Write-Host "URL metriques: $metricsUrl"
+  
+            try {
+              $metrics = Invoke-RestMethod -Method GET -Uri $metricsUrl -Headers $headers
+            }
+            catch {
+              Write-Error "Impossible de recuperer les metriques: $_"
+              exit 1
+            }
+  
+            $policyTotal = $metrics.policyViolationsTotal
+            $policyFail  = $metrics.policyViolationsFail
+            $policyWarn  = $metrics.policyViolationsWarn
+            $policyInfo  = $metrics.policyViolationsInfo
+  
+            $critical = $metrics.critical
+            $high     = $metrics.high
+            $medium   = $metrics.medium
+            $low      = $metrics.low
+  
+            Write-Host "Violations: total=$policyTotal, fail=$policyFail, warn=$policyWarn, info=$policyInfo"
+            Write-Host "Vulns: critical=$critical, high=$high, medium=$medium, low=$low"
+  
+            $maxPolicyFail   = 0
+            $maxCriticalVuln = 0
+            $maxHighVuln     = 5
+  
+            $failBuild = $false
+  
+            if ($policyFail -gt $maxPolicyFail) {
+                Write-Host "ECHEC: $policyFail violations FAIL"
+                $failBuild = $true
+            }
+  
+            if ($critical -gt $maxCriticalVuln) {
+                Write-Host "ECHEC: $critical vuln crit"
+                $failBuild = $true
+            }
+  
+            if ($high -gt $maxHighVuln) {
+                Write-Host "AVERTISSEMENT: $high vuln hautes"
+                $failBuild = $true
+            }
+  
+            if ($failBuild) {
+                Write-Host "BUILD BLOQUE"
+                exit 1
+            }
+            else {
+                Write-Host "Build OK"
+            }
